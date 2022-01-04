@@ -25,9 +25,13 @@ namespace Tetris {
             print_block(block.color);
             timer1.Start();
         }
-        public enum BlockTypes {
+        private enum BlockTypes {
             Z ,L, O, S, I, J, T
         }
+
+        //private enum toucj {
+
+        //}
 
         private class coord {
             public int x, y;
@@ -38,7 +42,7 @@ namespace Tetris {
 
         private class Block {
             /* Tetris block
-                *     All 7 blocks are constructed by 4 square but in different shape.
+                *     All 7 blocks are constructed by 4 "square" but in different shape.
                 */
 
             public Color color = new Color(); // square
@@ -47,8 +51,8 @@ namespace Tetris {
 
             public Block(Color c, int[,] s) {
                 color = c;
-                pos.x = 0;
-                pos.y = 0;
+
+                pos.x = pos.y = 0;
 
                 for (int i = 0; i < 4; i++) {
                     shape[i] = new coord();
@@ -58,25 +62,23 @@ namespace Tetris {
             }
 
             public void rotate() { // +90 deg
-                int temp = pos.x;
-                pos.x = -pos.y;
-                pos.y = temp;
+                foreach (coord c in shape) {
+                    int temp = c.x;
+                    c.x = -c.y;
+                    c.y = temp;
+                }
             }
 
             public void rotateCounter() { // -90 deg
-                int temp = x;
-                x = y;
-                y = -temp;
+                foreach (coord c in shape) {
+                    int temp = c.x;
+                    c.x = c.y;
+                    c.y = -temp;
+                }
             }
         };
 
         public void initGrid() {
-            //TableLayoutPanel1.ColumnCount = gameLenX;
-            //TableLayoutPanel1.RowCount = gameLenY;
-            //TableLayoutPanel1.Size = new Size(400, 800);
-            //TableLayoutPanel1.CellBorderStyle = TableLayoutPanelCellBorderStyle.Inset;
-            //TableLayoutPanel1.Dock = DockStyle.Fill;
-
             for (int i = 0; i < gameLenY; i++) {
                 for (int j = 0; j < gameLenX; j++) {
                     grids[i, j] = new Label();
@@ -112,7 +114,7 @@ namespace Tetris {
         public void moveLeft() {
             block.pos.x--;
 
-            if (collision_check()) {
+            if (collision_check() != 0) {
                 block.pos.x++;
             }
         }
@@ -120,59 +122,59 @@ namespace Tetris {
         public void moveRight() {
             block.pos.x++;
 
-            if (collision_check()) {
+            if (collision_check() != 0) {
                 block.pos.x--;
             }
         }
 
-        public void moveDown() {
+        public bool moveDown() {
             block.pos.y++;
 
-            if (collision_check()) {
+            int check = collision_check();
+            if (check == 4 || check == 5) {
                 block.pos.y--;
+                print_block(block.color);
+                block = newBlock(r.Next(6));
+                return false;
             }
+
+            return true;
         }
 
         public void rotate() {
-            foreach (coord c in block.shape) {
-                c.rotate();
-            }
+            block.rotate();
 
-           if (collision_check()) {
-                foreach (coord c in block.shape) {
-                    c.rotateCounter();
-                }
-            }
+           if (collision_check() != 0) {
+               block.rotateCounter();
+           }
         }
 
         public void rotateCounter() {
-            foreach (coord c in block.shape) {
-                c.rotateCounter();
-            }
+            block.rotateCounter();
 
-            if (collision_check()) {
-                foreach (coord c in block.shape) {
-                    c.rotate();
-                }
+            if (collision_check() != 0) {
+                block.rotate();
             }
         }
 
-        private bool collision_check() {
+        private int collision_check() {
             foreach (coord c in block.shape) {
                 int x = block.pos.x + c.x;
                 int y = block.pos.y + c.y;
 
                 // boundary
-                if (x < 0 || x >= gameLenX || y < 0 || y >= gameLenY)
-                    return true;
+                if (x < 0) return 1;
+                if (x >= gameLenX) return 2;
+                if (y < 0) return 3;
+                if (y >= gameLenY) return 4;
 
                 // blocks on the field
+                if (grids[y, x].BackColor != tableLayoutPanel2.BackColor) return 5;
             }
 
-            return false; // no collision
+            return 0; // no collision
         }
 
-        // print block
         private void print_block(Color c) {
             for (int i = 0; i < 4; i++) {
                 int x = block.pos.x + block.shape[i].x;
@@ -191,6 +193,7 @@ namespace Tetris {
                 case Keys.Up: rotate(); break;
                 case Keys.Z: rotateCounter(); break;
                 case Keys.Escape: Close(); break;
+                case Keys.Space: while(moveDown()); break;
             }
             print_block(block.color);
         }
@@ -201,8 +204,7 @@ namespace Tetris {
 
         // event
 
-        private void timer1_Tick(object sender, EventArgs e) {
-            
+        private void timer1_Tick(object sender, EventArgs e) {        
             move(Keys.Down);
         }
 
