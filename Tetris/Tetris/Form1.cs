@@ -14,21 +14,13 @@ namespace Tetris {
         const int gameLenX = 10;
         const int gameLenY = 20;
         Label[,] grids = new Label[gameLenY, gameLenX]; // gamefield
-        Label[,,] pic = new Label[4, 4, 6];
+        Label[][,] pic = new Label[6][,];
         Block block = null;
-        Block[] blockPics = new Block[7];
-        TableLayoutPanel[] table = new TableLayoutPanel[6]; // collect tables of HOLD and NEXT on form1
+        Block[] blockPics = new Block[7]; // 7 types of block, constant (treat like pictures)
+        // TableLayoutPanel[] table = new TableLayoutPanel[6]; // collect tables of HOLD and NEXT on form1
 
         BlockTypes holdType = BlockTypes.NULL;
         bool isHold = false;
-
-        public Form1() {
-            InitializeComponent();
-            init();
-            block = newBlock((BlockTypes) r.Next(6));
-            print_block(block.color);
-            timer1.Start();
-        }
 
         private enum BlockTypes {
             Z ,L, O, S, I, J, T, NULL
@@ -84,14 +76,38 @@ namespace Tetris {
                     c.y = -temp;
                 }
             }
+
+            public void print(Label[,] table) {
+                foreach (coord c in shape) {
+                    int x = pos.x + c.x;
+                    int y = pos.y + c.y;
+                    table[y, x].BackColor = color;
+                }
+            }
+
+            public void erase(Label[,] table) {
+                foreach (coord c in shape) {
+                    int x = pos.x + c.x;
+                    int y = pos.y + c.y;
+                    table[y, x].BackColor = Color.Black;
+                }
+            }
         };
+
+        public Form1() {
+            InitializeComponent();
+            init();
+            block = newBlock((BlockTypes)r.Next(6));
+            block.print(grids);
+            timer1.Start();
+        }
 
         public void init() {
             // add grid[,] to Contorl
             for (int i = 0; i < gameLenY; i++) {
                 for (int j = 0; j < gameLenX; j++) {
                     grids[i, j] = new Label();
-                    grids[i, j].BackColor = tableLayoutPanel2.BackColor;
+                    grids[i, j].BackColor = Color.Black;
                     grids[i, j].Dock = DockStyle.Fill;
                     grids[i, j].Margin = new Padding(0);
 
@@ -100,7 +116,7 @@ namespace Tetris {
             }
 
             // add pic[,,] to Contorl
-            table = new TableLayoutPanel[] {
+            TableLayoutPanel[] table = new TableLayoutPanel[] {
                 tableLayoutPanel3,
                 tableLayoutPanel5,
                 tableLayoutPanel6,
@@ -109,15 +125,17 @@ namespace Tetris {
                 tableLayoutPanel9
             };
 
-            for (int i = 0; i < 4; i++) {
-                for (int j = 0; j < 4; j++) {
-                    for (int k = 0; k < 6; k++) {
-                        pic[i, j, k] = new Label();
-                        pic[i, j, k].BackColor = tableLayoutPanel2.BackColor;
-                        pic[i, j, k].Dock = DockStyle.Fill;
-                        pic[i, j, k].Margin = new Padding(0);
+            for (int k = 0; k < 6; k++) {
+                pic[k] = new Label[4, 4];
 
-                        table[i].Controls.Add(pic[i, j, k], j, i);
+                for (int i = 0; i < 4; i++) {
+                    for (int j = 0; j < 4; j++) {
+                        pic[k][i, j] = new Label();
+                        pic[k][i, j].BackColor = Color.Black;
+                        pic[k][i, j].Dock = DockStyle.Fill;
+                        pic[k][i, j].Margin = new Padding(0);
+
+                        table[k].Controls.Add(pic[k][i, j], j, i);
                     }
                 }
             }
@@ -142,7 +160,7 @@ namespace Tetris {
         }
 
         private void move(Keys key) {
-            print_block(tableLayoutPanel2.BackColor);
+            block.erase(grids); // erase old block
             switch (key) {
                 case Keys.Left: moveLeft(); break;
                 case Keys.Right: moveRight(); break;
@@ -153,14 +171,14 @@ namespace Tetris {
                 case Keys.Escape: Close(); break;
                 case Keys.Space: while (moveDown()) ; break;
             }
-            print_block(block.color);
+            block.print(grids); // print new block
         }
 
         public void moveLeft() {
             block.pos.x--;
 
             if (collision_check() != 0) {
-                block.pos.x++;
+                block.pos.x++; // recovery
             }
         }
 
@@ -168,7 +186,7 @@ namespace Tetris {
             block.pos.x++;
 
             if (collision_check() != 0) {
-                block.pos.x--;
+                block.pos.x--; // recovery
             }
         }
 
@@ -177,8 +195,8 @@ namespace Tetris {
 
             int check = collision_check();
             if (check == 4 || check == 5) {
-                block.pos.y--;
-                print_block(block.color);
+                block.pos.y--; // recovery
+                block.print(grids); // recovery
 
                 block = newBlock((BlockTypes) r.Next(6));
                 if (collision_check() != 0) {
@@ -196,21 +214,57 @@ namespace Tetris {
             return true;
         }
 
+        public void rotate() {
+            block.rotate();
+
+            if (collision_check() != 0) {
+                block.rotateCounter(); // recovery
+            }
+        }
+
+        public void rotateCounter() {
+            block.rotateCounter();
+
+            if (collision_check() != 0) {
+                block.rotate(); // recovery
+            }
+        }
+
+        private int collision_check() {
+            foreach (coord c in block.shape) {
+                int x = block.pos.x + c.x;
+                int y = block.pos.y + c.y;
+
+                // boundary
+                if (x < 0) return 1;
+                if (x >= gameLenX) return 2;
+                if (y < 0) return 3;
+                if (y >= gameLenY) return 4;
+
+                // blocks on the field
+                if (grids[y, x].BackColor != Color.Black) return 5;
+            }
+
+            return 0; // no collision
+        }
+
         private void hold() {
             if (isHold) {
                 return;
             }
-
-            BlockTypes t = holdType;
-            holdType = block.type; // store type of current block
-            show_block(holdType, 1);
             isHold = true;
 
-            if (t == BlockTypes.NULL) { // there is no hold block (first hold)
+            BlockTypes old = holdType;
+            holdType = block.type; // store type of current block       
+
+            if (old == BlockTypes.NULL) { // there is no hold block (first hold)
+                blockPics[(int)holdType].print(pic[0]); // print current block on HOLD
                 block = newBlock((BlockTypes)r.Next(6));
             }
             else {
-                block = newBlock(t); // put hold block into gamefield
+                blockPics[(int)old].erase(pic[0]); // erase old block on HOLD
+                blockPics[(int)holdType].print(pic[0]); // print current block on HOLD
+                block = newBlock(old); // put hold block into gamefield
             }         
         }
 
@@ -221,7 +275,7 @@ namespace Tetris {
             for (int i = gameLenY - 1; i >= 0; i--) {
                 int j;
                 for (j = 0; j < gameLenX; j++) {
-                    if (grids[i, j].BackColor == tableLayoutPanel2.BackColor) {
+                    if (grids[i, j].BackColor == Color.Black) {
                         break;
                     }
                 }
@@ -241,66 +295,10 @@ namespace Tetris {
                         grids[i, j].BackColor = grids[oldLines[i], j].BackColor;
                     }
                     else {
-                        grids[i, j].BackColor = tableLayoutPanel2.BackColor; // Pad gamefield's color
+                        grids[i, j].BackColor = Color.Black; // Pad gamefield's color
                     }
                 }
             }
-        }
-
-        public void rotate() {
-            block.rotate();
-
-           if (collision_check() != 0) {
-               block.rotateCounter();
-           }
-        }
-
-        public void rotateCounter() {
-            block.rotateCounter();
-
-            if (collision_check() != 0) {
-                block.rotate();
-            }
-        }
-
-        private int collision_check() {
-            foreach (coord c in block.shape) {
-                int x = block.pos.x + c.x;
-                int y = block.pos.y + c.y;
-
-                // boundary
-                if (x < 0) return 1;
-                if (x >= gameLenX) return 2;
-                if (y < 0) return 3;
-                if (y >= gameLenY) return 4;
-
-                // blocks on the field
-                if (grids[y, x].BackColor != tableLayoutPanel2.BackColor) return 5;
-            }
-
-            return 0; // no collision
-        }
-
-        private void print_block(Color c) {
-            for (int i = 0; i < 4; i++) {
-                int x = block.pos.x + block.shape[i].x;
-                int y = block.pos.y + block.shape[i].y;
-                //Console.WriteLine("x = {0}, y = {1}", x, y);
-                grids[y, x].BackColor = c;
-            }
-        }
-
-        private void show_block(BlockTypes type, int where) { // show pic on HOLD or NEXT
-            int k = (int) type;
-            foreach (coord c in blockPics[k].shape) {
-                int x = c.x;
-                int y = c.y;
-
-                pic[y, x, where].BackColor = blockPics[k].color;
-            }
-        }
-
-        private void Form1_Load(object sender, EventArgs e) {
         }
 
 
