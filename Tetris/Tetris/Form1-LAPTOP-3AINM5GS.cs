@@ -11,18 +11,15 @@ using System.Windows.Forms;
 namespace Tetris {
     public partial class Form1 : Form {
         Random r = new Random();
-        Queue<int> num7 = new Queue<int>();
-        // gamefield
         const int gameLenX = 10;
         const int gameLenY = 20;
-        Label[,] grids = new Label[gameLenY, gameLenX]; // background gamefield
-        Block block = null; // block on gamefield
-
-        // HOLD and NEXT
-        Label[][,] picGrids = new Label[6][,]; // background of HOLD + NEXT*5
-        BlockTypes holdType = BlockTypes.NULL; // block on HOLD
-        BlockTypes[] nextType = new BlockTypes[5]; // block on NEXT
+        Label[,] grids = new Label[gameLenY, gameLenX]; // gamefield
+        Label[][,] pic = new Label[6][,];
+        Block block = null;
         Block[] blockPics = new Block[7]; // 7 types of block, constant (treat like pictures)
+        // TableLayoutPanel[] table = new TableLayoutPanel[6]; // collect tables of HOLD and NEXT on form1
+
+        BlockTypes holdType = BlockTypes.NULL;
         bool isHold = false;
 
         private enum BlockTypes {
@@ -69,24 +66,6 @@ namespace Tetris {
                     int temp = c.x;
                     c.x = -c.y;
                     c.y = temp;
-
-                    // shift to match rotation rall in Tetris
-                    switch (type) {
-                        case BlockTypes.Z: case BlockTypes.S:
-                            c.x += 2;
-                            break; 
-                        case BlockTypes.L: case BlockTypes.O:
-                            c.x++;
-                            break;
-                        case BlockTypes.I: case BlockTypes.J:
-                            c.x += 2;
-                            c.y--;
-                            break;
-                        case BlockTypes.T:
-                            c.x++;
-                            c.y--;
-                            break;
-                    }
                 }
             }
 
@@ -95,28 +74,10 @@ namespace Tetris {
                     int temp = c.x;
                     c.x = c.y;
                     c.y = -temp;
-
-                    // shift to match rotation rall in Tetris
-                    switch (type) {
-                        case BlockTypes.Z: case BlockTypes.S:
-                            c.y += 2;
-                            break;
-                        case BlockTypes.L: case BlockTypes.O:
-                            c.y++;
-                            break;
-                        case BlockTypes.I: case BlockTypes.J:
-                            c.x++;
-                            c.y += 2;
-                            break;
-                        case BlockTypes.T:
-                            c.x++;
-                            c.y++;
-                            break;
-                    }
                 }
             }
 
-            public void print(Label[,] table) { // print block on table
+            public void print(Label[,] table) {
                 foreach (coord c in shape) {
                     int x = pos.x + c.x;
                     int y = pos.y + c.y;
@@ -124,7 +85,7 @@ namespace Tetris {
                 }
             }
 
-            public void erase(Label[,] table) { // erase block on table
+            public void erase(Label[,] table) {
                 foreach (coord c in shape) {
                     int x = pos.x + c.x;
                     int y = pos.y + c.y;
@@ -136,13 +97,13 @@ namespace Tetris {
         public Form1() {
             InitializeComponent();
             init();
-            block = generateBlock();
+            block = newBlock((BlockTypes)r.Next(6));
             block.print(grids);
             timer1.Start();
         }
 
         public void init() {
-            // gamefield
+            // add grid[,] to Contorl
             for (int i = 0; i < gameLenY; i++) {
                 for (int j = 0; j < gameLenX; j++) {
                     grids[i, j] = new Label();
@@ -154,7 +115,7 @@ namespace Tetris {
                 }
             }
 
-            // HOLD and NEXT
+            // add pic[,,] to Contorl
             TableLayoutPanel[] table = new TableLayoutPanel[] {
                 tableLayoutPanel3,
                 tableLayoutPanel5,
@@ -165,20 +126,21 @@ namespace Tetris {
             };
 
             for (int k = 0; k < 6; k++) {
-                picGrids[k] = new Label[4, 4];
+                pic[k] = new Label[4, 4];
 
                 for (int i = 0; i < 4; i++) {
                     for (int j = 0; j < 4; j++) {
-                        picGrids[k][i, j] = new Label();
-                        picGrids[k][i, j].BackColor = Color.Black;
-                        picGrids[k][i, j].Dock = DockStyle.Fill;
-                        picGrids[k][i, j].Margin = new Padding(0);
+                        pic[k][i, j] = new Label();
+                        pic[k][i, j].BackColor = Color.Black;
+                        pic[k][i, j].Dock = DockStyle.Fill;
+                        pic[k][i, j].Margin = new Padding(0);
 
-                        table[k].Controls.Add(picGrids[k][i, j], j, i);
+                        table[k].Controls.Add(pic[k][i, j], j, i);
                     }
                 }
             }
 
+            // block Picture
             for (int i = 0; i < 7; i++) {
                 blockPics[i] = newBlock((BlockTypes) i);
             }
@@ -195,31 +157,6 @@ namespace Tetris {
                 case BlockTypes.T: return new Block(Color.Purple, new int[,] { { 0, 0 }, { 1, 0 }, { 2, 0 }, { 1, 1 } }, BlockTypes.T); // T
                 default: return new Block(Color.Purple, new int[,] { { 0, 0 }, { 1, 0 }, { 2, 0 }, { 1, 1 } }, BlockTypes.T); // T
             }
-        }
-
-        private Block generateBlock() { // Generate blocks with Tetris’s generation rules
-            if (num7.Count <= 7) {
-                // generate random no repeat numbers from 0 to 6
-                List<int> l = new List<int>() {0, 1, 2, 3, 4, 5, 6};
-                for (int i = 7; i > 0; i--) {
-                    int rand = r.Next(i);
-                    num7.Enqueue(l[rand]);
-                    Console.WriteLine(l[rand]);
-                    l.RemoveAt(rand);
-                }
-            }
-
-            // show 5 pics on NEXT
-            int[] arr = num7.ToArray();
-            for (int i = 0; i < 5; i++) {
-                blockPics[arr[i]].erase(picGrids[i+1]);
-                blockPics[arr[i+1]].print(picGrids[i+1]);
-            }
-            BlockTypes type = (BlockTypes)num7.Dequeue();
-            
-            Block b = newBlock(type);
-            b.pos.x = gameLenX / 2 - 1;
-            return b;
         }
 
         private void move(Keys key) {
@@ -261,7 +198,7 @@ namespace Tetris {
                 block.pos.y--; // recovery
                 block.print(grids); // recovery
 
-                block = generateBlock();
+                block = newBlock((BlockTypes) r.Next(6));
                 if (collision_check() != 0) {
                     timer1.Stop();
                     MessageBox.Show("GAMEOVER");
@@ -321,14 +258,13 @@ namespace Tetris {
             holdType = block.type; // store type of current block       
 
             if (old == BlockTypes.NULL) { // there is no hold block (first hold)
-                blockPics[(int)holdType].print(picGrids[0]); // print current block on HOLD
-                block = generateBlock();
+                blockPics[(int)holdType].print(pic[0]); // print current block on HOLD
+                block = newBlock((BlockTypes)r.Next(6));
             }
             else {
-                blockPics[(int)old].erase(picGrids[0]); // erase old block on HOLD
-                blockPics[(int)holdType].print(picGrids[0]); // print current block on HOLD
+                blockPics[(int)old].erase(pic[0]); // erase old block on HOLD
+                blockPics[(int)holdType].print(pic[0]); // print current block on HOLD
                 block = newBlock(old); // put hold block into gamefield
-                block.pos.x = gameLenX / 2 - 1;
             }         
         }
 
